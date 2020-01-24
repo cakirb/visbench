@@ -1,5 +1,8 @@
-library(tidyverse)
 library(cowplot)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 
@@ -101,9 +104,10 @@ ram_all <- ram_all %>% group_by(dataset, tool) %>% summarise(memory= median(memo
 
 tim_all <- rbind(tim_cxg, tim_isee, rt_scsva, usys_loom, usys_ucb, usys_scb, usys_scope)
 tim_all <- cbind(tim_all,tool)
-tim_all <- tim_all %>% group_by(dataset, tool) %>% summarise(time= median(time)) 
+tim_all <- tim_all %>% group_by(dataset, tool) %>% summarise(time= median(time)/60)
 
 dataset_names <- ram_all$dataset
+dataset_names <- str_to_upper(dataset_names)
 ram_all$dataset <- as.character(ram_all$dataset)
 tim_all$dataset <- as.character(tim_all$dataset)
 realval <-  c("5000","10000","25000","50000","100000","250000","500000","1000000","1500000","2000000")
@@ -121,17 +125,17 @@ rm(list=setdiff(ls(), c("ram_all","tim_all","dataset_names","tool")))
 #___________________________________________________________________________
 
 # Maximum RAM usage (x/y axes in log-scale)
-p1 <- ggplot(ram_all, aes(x = dataset, y = memory, color = tool)) + geom_point(position=position_dodge(w=0.02)) + geom_path() +
-  labs(x = element_blank(), y = 'RAM (GB)', color = 'Tools') + scale_y_log10() + 
+p1 <- ggplot(ram_all, aes(x = dataset, y = memory, color = tool)) + geom_point(size = 4, position=position_dodge(w=0.02)) + geom_path(size = 1.5) +
+  labs(x = 'Number of cells', y = 'RAM (GB)', color = 'Tools') + scale_y_log10() + 
   scale_x_continuous(trans = "log10", labels = dataset_names, breaks = ram_all$dataset) + theme_bw() + 
-  theme(text = element_text(size=16), axis.text.x=element_text(angle = -45, hjust = 0)) + 
+  theme(text = element_text(size=20), axis.text.x=element_text(angle = -45, hjust = 0)) + 
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + scale_color_brewer(palette = "Set2")
 
 # Start-up time (x/y axes in log-scale) 
-p2 <- ggplot(tim_all, aes(x = dataset, y = time, color = tool)) + geom_point(position=position_dodge(w=0.02)) + geom_path() + 
-  labs(x = 'Datasets', y = 'Seconds', color = 'Tools') + scale_y_log10() + 
+p2 <- ggplot(tim_all, aes(x = dataset, y = time, color = tool)) + geom_point(size = 4, position=position_dodge(w=0.02)) + geom_path(size = 1.5) + 
+  labs(x = 'Number of cells', y = 'Start-up time (minutes)', color = 'Tools') + scale_y_log10() + 
   scale_x_continuous(trans = "log10", labels = dataset_names, breaks = tim_all$dataset) + theme_bw() + 
-  theme(text = element_text(size=16), axis.text.x=element_text(angle = -45, hjust = 0)) + 
+  theme(text = element_text(size=20), axis.text.x=element_text(angle = -45, hjust = 0)) + 
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + scale_color_brewer(palette = "Set2")
 
 prow <- plot_grid(
@@ -139,24 +143,17 @@ prow <- plot_grid(
   p2 + theme(legend.position="none"),
   align = 'vh',
   labels = c("a", "b"),
-  label_size = 20,
+  label_size = 22,
   nrow = 2
 )
 
 legend_b <- get_legend(p1 + guides(color = guide_legend(nrow = 2)) +
-                         theme(legend.position = "bottom", text = element_text(size=16)))
+                         theme(legend.position = "bottom", text = element_text(size=18)))
 
 plot_grid(prow, legend_b, ncol=1, rel_heights = c(3, .3)) # Give it 0.1/3 of the width of one plot (via rel_widths).
 
 
-ggsave("boxplot_1912.pdf", h = 10)
-ggsave("boxplot_1912.png", h = 10)
+#ggsave("boxplot_visbench.pdf", h = 10)
+ggsave("boxplot_visbench.png", h = 10)
 
-
-
-file_size <- read.csv("filesizecomparison.csv", header = TRUE)
-ggplot(file_size, aes(x = FileType, y = MB, group = BasedOn, fill = Type)) + geom_bar(stat = "identity") + 
-  labs(x = 'File Type', y = 'MB', title = 'File size comparison') + theme_bw() + scale_color_brewer(palette = "Set2") +
-  theme(legend.position="none", text = element_text(size=14))
-ggsave("filesize.png")
 
