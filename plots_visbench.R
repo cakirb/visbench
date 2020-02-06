@@ -20,13 +20,23 @@ tim_cxg  <- data %>% slice(11:20) %>% select(-1) %>%
 
 
 ###isee
-data <- read.csv('data/isee.csv')
+# isee_sce
+data <- read.csv('data/isee_sce.csv')
 names(data) <- sub("^X", "", names(data))
 
-ram_isee <- data %>% slice(1:5) %>% select(-1) %>% 
-  stack() %>% rename(memory = values, dataset = ind) %>% 
+ram_isee_sce <- data %>% slice(1:5) %>% select(-1) %>%
+  stack() %>% rename(memory = values, dataset = ind) %>%
   mutate(memory = memory/1024)
-tim_isee  <- data %>% slice(6:10) %>% select(-1) %>% 
+tim_isee_sce  <- data %>% slice(6:10) %>% select(-1) %>%
+  stack() %>% rename(time = values, dataset = ind)
+#isee_loom
+data <- read.csv('data/isee_loom.csv')
+names(data) <- sub("^X", "", names(data))
+
+ram_isee_loom <- data %>% slice(1:5) %>% select(-1) %>%
+  stack() %>% rename(memory = values, dataset = ind) %>%
+  mutate(memory = memory/1024)
+tim_isee_loom  <- data %>% slice(6:10) %>% select(-1) %>%
   stack() %>% rename(time = values, dataset = ind)
 
 
@@ -35,9 +45,9 @@ data <- read.csv('data/scsva.csv') %>% select(-X)
 data$name <- str_remove(data$name, '_')
 data$name <- factor(data$name, levels = unique(data$name))
 
-ram_scsva <- data %>% select(name,memory) %>% 
+ram_scsva <- data %>% select(name,memory) %>%
   rename(dataset = name) %>% mutate(memory = memory/1024)
-rt_scsva <- data %>% select(name,time) %>% 
+rt_scsva <- data %>% select(name,time) %>%
   rename(dataset = name)
 
 
@@ -45,7 +55,7 @@ rt_scsva <- data %>% select(name,time) %>%
 data <- read.csv('data/loo.csv', header = TRUE)
 names(data) <- sub("^X", "", names(data))
 
-ram_loom <- data %>% slice(1:5) %>% stack() %>% 
+ram_loom <- data %>% slice(1:5) %>% stack() %>%
   rename(memory = values, dataset = ind) %>% mutate(memory = memory/(1024*1024))
 usr_loom <- data %>% slice(6:18) %>% slice(seq(1,20,3))
 sys_loom <- data %>% slice(7:19) %>% slice(seq(1,20,3))
@@ -91,18 +101,19 @@ usys_scope <- data %>% slice(16:20) %>% select(-1) %>% stack() %>% rename(time =
 
 ##merging results
 tool <- c(rep('cellxgene',nrow(ram_cxg)), 
-          rep('iSEE',nrow(ram_isee)), 
+          rep('iSEE-SCE',nrow(ram_isee_sce)),
+          rep('iSEE-loom',nrow(ram_isee_loom)),
           rep('scSVA',nrow(ram_scsva)),
           rep('loom-viewer',nrow(ram_loom)),
           rep('UCSC Cell Browser',nrow(ram_ucb)),
-          rep('Single Cell Browser',nrow(ram_scb)),
+          rep('Single Cell Explorer',nrow(ram_scb)),
           rep('SCope',nrow(ram_scope))
           )
-ram_all <- rbind(ram_cxg, ram_isee, ram_scsva, ram_loom, ram_ucb, ram_scb, ram_scope)
+ram_all <- rbind(ram_cxg, ram_isee_sce, ram_isee_loom, ram_scsva, ram_loom, ram_ucb, ram_scb, ram_scope)
 ram_all <- cbind(ram_all,tool)
 ram_all <- ram_all %>% group_by(dataset, tool) %>% summarise(memory= median(memory)) 
 
-tim_all <- rbind(tim_cxg, tim_isee, rt_scsva, usys_loom, usys_ucb, usys_scb, usys_scope)
+tim_all <- rbind(tim_cxg, tim_isee_sce, tim_isee_loom, rt_scsva, usys_loom,usys_ucb, usys_scb, usys_scope)
 tim_all <- cbind(tim_all,tool)
 tim_all <- tim_all %>% group_by(dataset, tool) %>% summarise(time= median(time)/60)
 
@@ -126,16 +137,16 @@ rm(list=setdiff(ls(), c("ram_all","tim_all","dataset_names","tool")))
 
 # Maximum RAM usage (x/y axes in log-scale)
 p1 <- ggplot(ram_all, aes(x = dataset, y = memory, color = tool)) + geom_point(size = 4, position=position_dodge(w=0.02)) + geom_path(size = 1.5) +
-  labs(x = 'Number of cells', y = 'RAM (GB)', color = 'Tools') + scale_y_log10() + 
+  labs(x = 'Number of cells', y = 'Preprocessing memory (GB)', color = 'Tools') + scale_y_log10() + 
   scale_x_continuous(trans = "log10", labels = dataset_names, breaks = ram_all$dataset) + theme_bw() + 
-  theme(text = element_text(size=20), axis.text.x=element_text(angle = -45, hjust = 0)) + 
+  theme(text = element_text(size=18), axis.text.x=element_text(angle = -45, hjust = 0), axis.text.y = element_text(vjust = 0.1)) + 
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + scale_color_brewer(palette = "Set2")
 
 # Start-up time (x/y axes in log-scale) 
 p2 <- ggplot(tim_all, aes(x = dataset, y = time, color = tool)) + geom_point(size = 4, position=position_dodge(w=0.02)) + geom_path(size = 1.5) + 
-  labs(x = 'Number of cells', y = 'Start-up time (minutes)', color = 'Tools') + scale_y_log10() + 
+  labs(x = 'Number of cells', y = 'Preprocessing time (minutes)', color = 'Tools') + scale_y_log10() + 
   scale_x_continuous(trans = "log10", labels = dataset_names, breaks = tim_all$dataset) + theme_bw() + 
-  theme(text = element_text(size=20), axis.text.x=element_text(angle = -45, hjust = 0)) + 
+  theme(text = element_text(size=18), axis.text.x=element_text(angle = -45, hjust = 0), axis.text.y = element_text(vjust = 0.1)) + 
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + scale_color_brewer(palette = "Set2")
 
 prow <- plot_grid(
@@ -143,7 +154,8 @@ prow <- plot_grid(
   p2 + theme(legend.position="none"),
   align = 'vh',
   labels = c("a", "b"),
-  label_size = 22,
+  label_size = 20,
+  label_y = 1.03,
   nrow = 2
 )
 
